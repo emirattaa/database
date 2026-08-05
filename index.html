@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub database.json Yönetici</title>
+    <style>
+        :root {
+            --bg-color: #040e06;
+            --surface-bg: #0a1f0d;
+            --border-color: #17421e;
+            --text-color: #84cc90;
+            --text-light: #b5ebb0;
+            --primary: #1f7a30;
+            --primary-hover: #29a341;
+            --danger: #9c2e2e;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            background-color: var(--surface-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            width: 100%;
+            max-width: 650px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            box-sizing: border-box;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--text-light);
+            font-size: 1.4rem;
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            margin-bottom: 8px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .config-box {
+            background-color: #020803;
+            border: 1px solid var(--border-color);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        label {
+            display: block;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+            color: #70b87c;
+        }
+
+        input[type="text"], input[type="password"], textarea {
+            width: 100%;
+            padding: 10px;
+            background-color: #040e06;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+            outline: none;
+            font-family: inherit;
+        }
+
+        input:focus, textarea:focus {
+            border-color: var(--primary-hover);
+        }
+
+        textarea {
+            height: 250px;
+            resize: vertical;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .status {
+            text-align: center;
+            font-size: 0.9rem;
+            margin-top: 15px;
+            font-weight: bold;
+            min-height: 22px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>database.json Bulut Yöneticisi</h1>
+        
+        <!-- GitHub Kimlik Bilgileri -->
+        <div class="config-box">
+            <div class="section-title">GitHub Repo Ayarları</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Kullanıcı Adı (Owner):</label>
+                    <input type="text" id="ghOwner" placeholder="örn: burak">
+                </div>
+                <div class="form-group">
+                    <label>Depo Adı (Repo):</label>
+                    <input type="text" id="ghRepo" placeholder="örn: veri-tabani">
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label>Personal Access Token (PAT):</label>
+                <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxx">
+            </div>
+        </div>
+
+        <!-- JSON İçerik Alanı -->
+        <div class="section-title">database.json İçeriği</div>
+        <div class="form-group">
+            <textarea id="jsonContent" placeholder='{
+  "records": [
+    { "id": 1, "isim": "emir", "platform": "github" }
+  ]
+}'></textarea>
+        </div>
+
+        <div class="btn-group">
+            <button onclick="loadDatabase()">Veriyi Çek (GET)</button>
+            <button onclick="saveDatabase()">Veriyi Kaydet (PUT)</button>
+        </div>
+
+        <div class="status" id="statusMsg"></div>
+    </div>
+
+    <script>
+        const FILE_PATH = "database.json";
+
+        // Sayfa açıldığında kayıtlı ayarları localStorage'dan yükle
+        window.onload = function() {
+            if(localStorage.getItem('ghOwner')) document.getElementById('ghOwner').value = localStorage.getItem('ghOwner');
+            if(localStorage.getItem('ghRepo')) document.getElementById('ghRepo').value = localStorage.getItem('ghRepo');
+            if(localStorage.getItem('ghToken')) document.getElementById('ghToken').value = localStorage.getItem('ghToken');
+            
+            // Ayarlar tamamsa otomatik veriyi çekmeyi dene
+            if(localStorage.getItem('ghOwner') && localStorage.getItem('ghRepo') && localStorage.getItem('ghToken')) {
+                loadDatabase();
+            }
+        };
+
+        function saveConfigToLocal() {
+            localStorage.setItem('ghOwner', document.getElementById('ghOwner').value.trim());
+            localStorage.setItem('ghRepo', document.getElementById('ghRepo').value.trim());
+            localStorage.setItem('ghToken', document.getElementById('ghToken').value.trim());
+        }
+
+        async function loadDatabase() {
+            saveConfigToLocal();
+            const owner = document.getElementById('ghOwner').value.trim();
+            const repo = document.getElementById('ghRepo').value.trim();
+            const token = document.getElementById('ghToken').value.trim();
+            const statusEl = document.getElementById('statusMsg');
+
+            if (!owner || !repo || !token) {
+                statusEl.style.color = "#d9a3a3";
+                statusEl.innerText = "Lütfen GitHub Bilgilerini ve Token'ı eksiksiz doldurun!";
+                return;
+            }
+
+            statusEl.style.color = "#a3d9a5";
+            statusEl.innerText = "database.json GitHub'dan çekiliyor...";
+
+            const url = `https://api.github.com/repos/${owner}/${repo}/contents/${FILE_PATH}`;
+
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        "Authorization": `token ${token}`,
+                        "Accept": "application/vnd.github.v3+json"
+                    }
+                });
+
+                if (!response.ok) {
+                    if(response.status === 404) {
+                        throw new Error("database.json dosyası repoda bulunamadı. Aşağıdan Kaydet butonuna basarak ilk sürümü oluşturabilirsin.");
+                    }
+                    throw new Error("Bağlantı hatası! Status: " + response.status);
+                }
+
+                const data = await response.json();
+                // GitHub içeriği Base64 formatında tutar, metne çevirelim:
+                const decodedContent = decodeURIComponent(escape(atob(data.content)));
+                
+                // JSON formatının düzgün görünmesi için parse edip tekrar stringify yapalım
+                try {
+                    const parsed = JSON.parse(decodedContent);
+                    document.getElementById('jsonContent').value = JSON.stringify(parsed, null, 2);
+                } catch(err) {
+                    document.getElementById('jsonContent').value = decodedContent;
+                }
+
+                statusEl.style.color = "#28a745";
+                statusEl.innerText = "database.json başarıyla yüklendi!";
+            } catch (error) {
+                statusEl.style.color = "#d9a3a3";
+                statusEl.innerText = error.message;
+            }
+        }
+
+        async function saveDatabase() {
+            saveConfigToLocal();
+            const owner = document.getElementById('ghOwner').value.trim();
+            const repo = document.getElementById('ghRepo').value.trim();
+            const token = document.getElementById('ghToken').value.trim();
+            const content = document.getElementById('jsonContent').value.trim();
+            const statusEl = document.getElementById('statusMsg');
+
+            if (!owner || !repo || !token) {
+                statusEl.style.color = "#d9a3a3";
+                statusEl.innerText = "Lütfen GitHub Bilgilerini ve Token'ı eksiksiz doldurun!";
+                return;
+            }
+
+            // JSON format kontrolü
+            try {
+                JSON.parse(content);
+            } catch (e) {
+                statusEl.style.color = "#d9a3a3";
+                statusEl.innerText = "Hata: Girilen metin geçerli bir JSON formatında değil!";
+                return;
+            }
+
+            statusEl.style.color = "#a3d9a5";
+            statusEl.innerText = "database.json GitHub'a kaydediliyor...";
+
+            const url = `https://api.github.com/repos/${owner}/${repo}/contents/${FILE_PATH}`;
+
+            try {
+                // Güncelleme yapabilmek için dosyanın güncel SHA kodunu bulmamız gerekiyor
+                let sha = "";
+                const getRes = await fetch(url, {
+                    headers: {
+                        "Authorization": `token ${token}`,
+                        "Accept": "application/vnd.github.v3+json"
+                    }
+                });
+
+                if (getRes.ok) {
+                    const fileData = await getRes.json();
+                    sha = fileData.sha;
+                }
+
+                // İçeriği Base64 formatına encode et
+                const encodedContent = btoa(unescape(encodeURIComponent(content)));
+
+                // GitHub API ile dosyayı güncelle / oluştur
+                const putRes = await fetch(url, {
+                    method: "PUT",
+                    headers: {
+                        "Authorization": `token ${token}`,
+                        "Content-Type": "application/json",
+                        "Accept": "application/vnd.github.v3+json"
+                    },
+                    body: JSON.stringify({
+                        message: "database.json web arayüzü ile güncellendi",
+                        content: encodedContent,
+                        sha: sha ? sha : undefined 
+                    })
+                });
+
+                if (!putRes.ok) {
+                    const errJson = await putRes.json();
+                    throw new Error(errJson.message || "Kayıt işlemi başarısız oldu.");
+                }
+
+                statusEl.style.color = "#28a745";
+                statusEl.innerText = "database.json başarıyla güncellendi ve commit atıldı!";
+            } catch (error) {
+                statusEl.style.color = "#d9a3a3";
+                statusEl.innerText = "Hata: " + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
+
