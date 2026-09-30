@@ -1,0 +1,46 @@
+name: DB
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: İşlem
+        type: choice
+        options: [set, delete]
+        default: set
+      key:
+        description: Anahtar
+        required: true
+      value:
+        description: Değer (set için)
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      ACTION: ${{ inputs.action }}
+      KEY: ${{ inputs.key }}
+      VALUE: ${{ inputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Veriyi güncelle
+        run: |
+          [ -f data.json ] || echo '{}' > data.json
+          if [ "$ACTION" = "delete" ]; then
+            jq --arg k "$KEY" 'del(.[$k])' data.json > tmp.json
+          else
+            jq --arg k "$KEY" --arg v "$VALUE" '.[$k]=$v' data.json > tmp.json
+          fi
+          mv tmp.json data.json
+
+      - name: Commit
+        run: |
+          git config user.name "db-bot"
+          git config user.email "db-bot@users.noreply.github.com"
+          git add data.json
+          git diff --cached --quiet || (git commit -m "$ACTION $KEY" && git push)
